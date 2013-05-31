@@ -170,8 +170,8 @@ xusb_write_ram(size_t addr, const unsigned char *data, size_t nbytes, usb_dev_ha
 	{
 		size_t bs = dend-d;
 		size_t dl_addr = addr+(d-data);
-		int requesttype = 0x40; /*TODO*/
-		int request = 0xa0; /*TODO*/
+		int requesttype = 0x40;
+		int request = 0xa0;
 		if (bs > chunk_size)
 			bs = chunk_size;
 		if (usb_control_msg( usbdevhandle, requesttype, request, dl_addr, 0, (char*)d, bs, 1000) < 0)
@@ -205,8 +205,23 @@ xusb_read_ram(size_t addr, unsigned char *data, size_t nbytes, usb_dev_handle *u
 	{
 		size_t bs = dend-d;
 		size_t rd_addr = addr+(d-data);
-		int requesttype = 0xc0; /*TODO*/
+		int requesttype = 0xc0; /*1100_0000*/
 		int request = 0xa0;
+		/* Request type (usb1.1 chapter 9.3)*/
+		/*
+		 * D7: Data transfer direction 0 = Host-to-device
+		 * 1 = Device-to-host
+		 * D6...5: Type
+		 * 0 = Standard
+		 * 1 = Class
+		 * 2 = Vendor
+		 * 3 = Reserved
+		 * D4...0: Recipient 0 = Device
+		 * 1 = Interface
+		 * 2 = Endpoint
+		 * 3 = Other
+		 * 4...31 = Reserved
+		 */
 		if (bs > chunk_size)
 			bs = chunk_size;
 		if ( usb_control_msg (usbdevhandle, requesttype, request, rd_addr, 0, (char*)d, bs, 1000)< 0 )
