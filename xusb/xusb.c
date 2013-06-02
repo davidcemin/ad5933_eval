@@ -290,4 +290,23 @@ xusb_program_hex_file(const char *path, usb_dev_handle *usbdevhandle)
 
 /********************************************************************************/
 
+struct usb_device *
+xusb_find_device(int vendor_id, int prod_id)
+{
+	struct usb_bus *b = NULL;
+	struct usb_device *d = NULL;
+	
+	/*usb_busses is a global inside usb.h that returns usb_get_busses value*/
+	for (b = usb_busses; b; b=b->next)
+	{
+		for (d = b->devices; d; d=d->next)
+		{
+			//fprintf(stdout, "Vendor ID: 0x%04x Product ID: 0x%04x\n", d->descriptor.idVendor, d->descriptor.idProduct);
+			if ( (d->descriptor.idVendor == vendor_id ) && (d->descriptor.idProduct == prod_id) )
+				return (d);
+		}
+	}
+	return (NULL);	
+}
+
 

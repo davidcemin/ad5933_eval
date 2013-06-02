@@ -89,4 +89,16 @@ xusb_program_hex_file(const char *path, usb_dev_handle *usbdevhandle);
 
 /********************************************************************************/
 
+/**
+ * \brief Finds the desired usb devices on the system busses
+ * \param vendor_id Vendor id: 16 bit number
+ * \param prod_id	Product id: 16 bit number
+ * \return Pointer to usb_device structure when it finds it, NULL otherwise 
+ */
+struct usb_device *
+xusb_find_device(int vendor_id, int prod_id);
+
+/********************************************************************************/
+
+
 #endif /*__XUSB_H__*/
