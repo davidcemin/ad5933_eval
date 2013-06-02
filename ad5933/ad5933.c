@@ -41,6 +41,9 @@ main (int argc, char **argv)
 	int prod_id = 0xb203;  /*Prod id =)*/
 	int rv = 0;
 	struct usb_device *usbdev = NULL;
+	struct usb_dev_handle *usbdevhandle = NULL;
+	const char *file = "../fw/hex/AD5933_34FW.hex";
+	unsigned int err = 0;
 
 	/* Initializing libusb*/
 	usb_init();
@@ -68,6 +71,15 @@ main (int argc, char **argv)
 	fprintf(stdout, "Using ID %04x:%04x on %s.%s.\n",
 			usbdev->descriptor.idVendor, usbdev->descriptor.idProduct,
 			usbdev->bus->dirname, usbdev->filename);
+
+	/*opening device*/
+	if ( !(usbdevhandle = xusb_open(usbdev)) )
+		return(1);
+
+	//fprintf(stderr, "(Main) dev %p\n", usbdevhandle);
+
+	fprintf(stdout, "Programming 8051 using %s \n", file);
+	err += xusb_program_hex_file(file, usbdevhandle);
 
 	return (0);
 }

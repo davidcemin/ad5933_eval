@@ -24,11 +24,10 @@
 /**
  * \brief Open usb device
  * \param _usbdev Pointer to usb device that will be opened
- * \param usb_dev_handle Pointer with the usb handler
- * \return 0 on success, 1 on error.
+ * \return Vallid pointer to usb_dev_handle structure, NULL otherwise
  */
-int
-xusb_open(struct usb_device *_usbdev, usb_dev_handle *usbdevhandle);
+struct usb_dev_handle *
+xusb_open(struct usb_device *_usbdev);
 
 /********************************************************************************/
 
