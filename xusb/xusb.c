@@ -118,14 +118,13 @@ xusb_program_hex_line(const char *buf, const char *path, int line, usb_dev_handl
 /* Public stuff */
 /********************************************************************************/
 int 
-xusb_open(struct usb_device *_usbdev)
+xusb_open(struct usb_device *_usbdev, usb_dev_handle *usbdevhandle)
 {
 	struct usb_device *usbdev = _usbdev;
-	usb_dev_handle *usbhandle;
 	//xusb_close();
 
-	usbhandle = usb_open(usbdev);
-	if (!usbhandle)
+	usbdevhandle = usb_open(usbdev);
+	if (!usbdevhandle)
    	{
 		fprintf(stderr, "Failed to open device: %s\n", usb_strerror());
 		return -1;
@@ -137,13 +136,13 @@ xusb_open(struct usb_device *_usbdev)
 /********************************************************************************/
 
 int
-xusb_close(usb_dev_handle * usbhandle)
+xusb_close(usb_dev_handle * usbdevhandle)
 {
 	int rv = 0;
-	if (usbhandle)
+	if (usbdevhandle)
    	{
-		rv = usb_close(usbhandle);
-		usbhandle = NULL;
+		rv = usb_close(usbdevhandle);
+		usbdevhandle = NULL;
 		if (rv)
 			fprintf(stderr, "Closing USB device: %s\n", usb_strerror());
 	}

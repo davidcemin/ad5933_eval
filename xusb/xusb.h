@@ -24,10 +24,11 @@
 /**
  * \brief Open usb device
  * \param _usbdev Pointer to usb device that will be opened
+ * \param usb_dev_handle Pointer with the usb handler
  * \return 0 on success, 1 on error.
  */
 int
-xusb_open(struct usb_device *_usbdev);
+xusb_open(struct usb_device *_usbdev, usb_dev_handle *usbdevhandle);
 
 /********************************************************************************/
 
@@ -37,7 +38,7 @@ xusb_open(struct usb_device *_usbdev);
  * \return 0 on success
  */
 int
-xusb_close(usb_dev_handle * usbhandle);
+xusb_close(usb_dev_handle * usbdevhandle);
 
 /********************************************************************************/
 
