@@ -62,7 +62,7 @@ xusb_write_ram(size_t addr, const unsigned char *data, size_t nbytes, usb_dev_ha
  * \return Number of writing errors, -1 if dev is closed
  */
 int
-xusb_read_ram(size_t addr, unsigned char *data, size_t nbytes, usb_dev_handle *usbdevhandle);
+xusb_read_ram(int addr, unsigned char *data, size_t nbytes, usb_dev_handle *usbdevhandle);
 
 /********************************************************************************/
 

@@ -63,6 +63,7 @@ xusb_program_hex_line(const char *buf, const char *path, int line, usb_dev_handl
 		fprintf(stderr, "%s:%d: Format violation (2)\n", path, line);
 		return (1);
 	}
+	//fprintf(stderr, "nbytes: %02x Addr: %04x Type: %02x\n\r", nbytes, addr, type);
 	s += 8;
 
 	switch (type)
@@ -189,7 +190,7 @@ xusb_write_ram(size_t addr, const unsigned char *data, size_t nbytes, usb_dev_ha
 /********************************************************************************/
 
 int
-xusb_read_ram(size_t addr, unsigned char *data, size_t nbytes, usb_dev_handle *usbdevhandle)
+xusb_read_ram(int addr, unsigned char *data, size_t nbytes, usb_dev_handle *usbdevhandle)
 {
 	int n_errors = 0;
 	const size_t chunk_size = 16;
@@ -205,10 +206,10 @@ xusb_read_ram(size_t addr, unsigned char *data, size_t nbytes, usb_dev_handle *u
 	while(d<dend)
 	{
 		size_t bs = dend-d;
-		size_t rd_addr = addr+(d-data);
+		int rd_addr = addr+(d-data);
 		int requesttype = 0xc0; /*1100_0000*/
 		int request = 0xa0;
-		/* Request type (usb1.1 chapter 9.3)*/
+		/* Request type (usb20 chapter 9.3)*/
 		/*
 		 * D7: Data transfer direction 0 = Host-to-device
 		 * 1 = Device-to-host
@@ -227,7 +228,7 @@ xusb_read_ram(size_t addr, unsigned char *data, size_t nbytes, usb_dev_handle *u
 			bs = chunk_size;
 		if ( usb_control_msg (usbdevhandle, requesttype, request, rd_addr, 0, (char*)d, bs, 1000)< 0 )
 		{
-			fprintf(stderr, "Reading %zu bytes at 0x%zx: %s\n", bs, rd_addr, usb_strerror());
+			fprintf(stderr, "Reading %zu bytes at 0x%x: %s\n", bs, rd_addr, usb_strerror());
 			++n_errors;
 		}
 		d += bs;
@@ -295,11 +296,11 @@ xusb_program_hex_file(const char *path, usb_dev_handle *usbdevhandle)
 struct usb_device *
 xusb_find_device(int vendor_id, int prod_id)
 {
-	struct usb_bus *b = NULL;
+	struct usb_bus *b = usb_get_busses();
 	struct usb_device *d = NULL;
 	
 	/*usb_busses is a global inside usb.h that returns usb_get_busses value*/
-	for (b = usb_busses; b; b=b->next)
+	for (; b; b=b->next)
 	{
 		for (d = b->devices; d; d=d->next)
 		{
