@@ -2,6 +2,7 @@
 VERSION 	:= 0.1
 TARGET		:= ad5933_eval
 DIST_DEST	:= ad5933-$(VERSION)
+PLAT		:=
 
 ########################################################################
 #Include dirs
@@ -11,20 +12,23 @@ LIBUSB_LIB_DIR		:= /opt/local/lib/libusb-legacy
 
 ########################################################################
 #flags
-CFLAGS   := -O2 -W -Wall -Wmissing-declarations -Wmissing-prototypes -fno-exceptions -DXUSB_VERSION=\"$(VERSION)\" -Wformat
-CINCLUDE := -I. -I$(XUSB_DIR) -I$(LIBUSB_INCLUDE_DIR)
-CLIBDIR  :=
-CLIBS    := -L$(LIBUSB_LIB_DIR) -lusb-legacy
-DEPFLAGS := -MM
+CFLAGS   	:= -O2 -W -Wall -Wmissing-declarations -Wmissing-prototypes -fno-exceptions -DXUSB_VERSION=\"$(VERSION)\" -Wformat
+CINCLUDE 	:= -I. -I$(XUSB_DIR) 
+CLIBDIR  	:=
+CLIBS_MAC	:= -L$(LIBUSB_LIB_DIR) -lusb-legacy
+CLIBS_LINUX	:= -lusb
+DEPFLAGS	:= -MM
 
 #CFLAGS   := -O2 -W -Wall -Werror -Wmissing-declarations -Wmissing-prototypes -fno-exceptions -DXUSB_VERSION=\"$(VERSION)\" -Wformat
 ########################################################################
 #includes
-INCLUDE    = ${CINCLUDE}
-FLAGS      = ${CFLAGS}
-LIBDIR     = ${CLIBDIR}
-LIBS       = ${CLIBS}
-LIBINCLUDE = $(LIBDIR)
+INCLUDE_LINUX	:= ${CINCLUDE} -I/usr/include
+INCLUDE_MAC		:= ${CINCLUDE} -I$(LIBUSB_INCLUDE_DIR)
+FLAGS			:= ${CFLAGS}
+LIBDIR			:= ${CLIBDIR}
+LIBS_MAC		:= ${CLIBS_MAC}
+LIBS_LINUX		:= $(CLIBS_LINUX)
+LIBINCLUDE		:= $(LIBDIR)
 
 ########################################################################
 #Setzen alle zusammen..
@@ -32,8 +36,13 @@ CC 		= gcc -pipe
 LD       = ld
 AR       = ar
 ARFLAGS  = rvu
-CMPFLAGS = ${FLAGS} ${INCLUDE}
-LDFLAGS  = ${LIBS}
+ifeq ($(PLAT),linux)
+	CMPFLAGS = ${FLAGS} ${INCLUDE_LINUX}
+	LDFLAGS  = ${LIBS_LINUX}
+else
+	CMPFLAGS = ${FLAGS} ${INCLUDE_MAC}
+	LDFLAGS  = ${LIBS_MAC}
+endif
 
 ########################################################################
 CSOURCES = $(wildcard *.c)
@@ -43,7 +52,7 @@ OBJS	 = $(XUSB_DIR)/*.o
 LIBFILES =
 
 #General
-QUIET = @
+QUIET = 
 
 .PHONY: clean clobber dist
 
@@ -58,7 +67,11 @@ $(TARGET): $(OBJECTS)
 
 %.o: %.c
 	$(QUIET)echo Creating object: $@
-	$(QUIET)$(CC) $(CMPFLAGS) $(LIBS) -c $^
+ifeq ($(PLAT),linux)
+	$(QUIET)$(CC) $(CMPFLAGS) $(LIBS_LINUX) -c $^
+else
+	$(QUIET)$(CC) $(CMPFLAGS) $(LIBS_MAC) -c $^
+endif
 
 clean:
 	$(QUIET)echo Removing temp and object files
