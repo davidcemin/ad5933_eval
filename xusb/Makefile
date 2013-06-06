@@ -1,9 +1,11 @@
+PLAT	:=
 CC = gcc -pipe
 VERSION = 0.1
 CFLAGS = -O2 -fno-exceptions -DXUSB_VERSION=\"$(VERSION)\" \
 	-W -Wall -Wformat
 LDFLAGS = -lusb-legacy
-INCLUDE = /opt/local/include/libusb-legacy
+INCLUDE_LINUX = -I/usr/include -I./
+INCLUDE_MAC = -I/opt/local/include/libusb-legacy -I./
 DIST_DEST = xusbprog-$(VERSION)
 LDUSB = /opt/local/lib/libusb-legacy
 all: xusbprog
@@ -27,6 +29,10 @@ dist:
 	rm -r "$(DIST_DEST)"
 
 .c.o:
-	$(CC) -c $(CFLAGS) -I$(INCLUDE) $<
+ifeq ($(PLAT),linux)
+	$(CC) -c $(CFLAGS) $(INCLUDE_LINUX) $<
+else
+	$(CC) -c $(CFLAGS) $(INCLUDE_MAC) $<
+endif
 
 xusb.o: xusb.c xusb.h
