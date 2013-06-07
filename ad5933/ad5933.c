@@ -75,7 +75,7 @@ ad5933_get_status(usb_dev_handle *h)
 
 	ad5933_reg_read(h, AD5933_STS_REG, &sts_reg, 1);
 
-	printf("status reg = 0x%x\n\r", sts_reg);
+	//printf("status reg = 0x%x\n\r", sts_reg);
 
 	return (sts_reg);
 }
@@ -92,9 +92,6 @@ ad5933_reset(usb_dev_handle *h)
 	ctrl_lsb |= MASK_RESET_TRUE;
 	ad5933_reg_write(h, AD5933_CTRL_REG_LSB, ctrl_lsb, 1);
 	ad5933_reg_read(h, AD5933_CTRL_REG_LSB, &ctrl_lsb, 1);
-
-	//printf("CTRL LSB = 0x%x\n", ctrl_lsb);
-
 
 	return (0);
 }
@@ -223,7 +220,7 @@ ad5933_imped_calibration(usb_dev_handle *h, double *gf)
 	short real = 0x0000;
 	short imag = 0x0000;
 	unsigned char ctrl_reg = 0;
-	unsigned int steps = 200;
+	unsigned int steps = 511;
 	unsigned int inc = 1;
 	unsigned int i = 0;
 	unsigned char sweep_ok = 0;
@@ -234,7 +231,7 @@ ad5933_imped_calibration(usb_dev_handle *h, double *gf)
 	/*2: Number of increments register*/
 	ad5933_numb_incr_set(h, steps);
 	/*3: Frequency increment register*/
-	ad5933_freq_inc_set(h, 1);
+	ad5933_freq_inc_set(h, 0.2);
 	/* Settling time*/
 	ad5933_settling_set(h, 15, 0);
 
@@ -257,9 +254,6 @@ ad5933_imped_calibration(usb_dev_handle *h, double *gf)
 	ctrl_reg = MASK_START_FREQ_SWEEP | MASK_OUTPUT_2Vpp | MASK_PGA_GAIN5x;
 	ad5933_reg_write(h, AD5933_CTRL_REG_MSB, ctrl_reg, 1);
 
-	ctrl_reg = 0;
-	ad5933_reg_read(h, AD5933_CTRL_REG_MSB, &ctrl_reg, 1);
-
 	while ( sweep_ok != MASK_STS_FRQ_SWP_RDY)
 	{
 		unsigned char sts = 0;
@@ -267,8 +261,8 @@ ad5933_imped_calibration(usb_dev_handle *h, double *gf)
 		int j = 0;
 
 		ad5933_reg_read(h, AD5933_CTRL_REG_MSB, &ctrl_inc, 1);
-		sts = ad5933_get_status(h);
-		while ( ( sts & MASK_STS_IMPED_VALID ) != MASK_STS_IMPED_VALID) {
+
+		while ((sts = (ad5933_get_status(h) & MASK_STS_IMPED_VALID)) != MASK_STS_IMPED_VALID) {
 			printf("waiting imp valid..0x%x %d\n\r", sts, j);
 			usleep(1000);
 			j++;
@@ -279,11 +273,13 @@ ad5933_imped_calibration(usb_dev_handle *h, double *gf)
 		m2 = ad5933_magnitude_calc(ir.real_msb, ir.real_lsb, ir.imag_msb, ir.imag_lsb);
 		printf("m1 = %04f m2 = %04f\n\r", m1, m2);
 
-		i += inc;
 		ctrl_inc |= MASK_INC_FREQ;
 		ad5933_reg_write(h, AD5933_CTRL_REG_MSB, ctrl_inc, 1);
 		sweep_ok = ad5933_get_status(h) & MASK_STS_FRQ_SWP_RDY;
-		printf("sweep ok 0x%x \n\r", sweep_ok);
+		printf("sweep ok 0x%x i = %d\n\r", sweep_ok, i);
+		if (i != steps)
+			sweep_ok = 0;
+		i += inc;
 	}
 
 	printf("-------------------------------------\n\r");
@@ -292,12 +288,33 @@ ad5933_imped_calibration(usb_dev_handle *h, double *gf)
 
 	/*two measures, we are considering that it varies linearly with the frequency.
 	 * The smaller the difference (delta F) in frequency, the better */
-	*gf = (pow(10,9)/AD5933_RES_FEEDBACK_VAL)/( ((m2-m1)/2) + m2);
+	*gf = (pow(10,9)/AD5933_RES_CALIB_VAL)/( ((m2-m1)/2) + m2);
 
 	return (ret);
 }
 
 /********************************************************************************/
+
+static inline double
+ad5933_phase_calc(unsigned char rmsb, unsigned char rlsb, unsigned char imsb, unsigned char ilsb)
+{
+	double ph = 0.0;
+	double r = (rmsb << 8) | (rlsb);
+	double i = (imsb << 8) | (ilsb);
+
+	if ( (r>0) && (i>0) ) /*first quadrant*/
+		ph = atan(i/r)*180/M_PI;
+	else if ( (r<0) && (i>0) ) /*second quadrant*/
+		ph = atan(i/r)*180/M_PI + 180;
+	else if ( (r<0) && (i<0) ) /*third quadrant*/
+		ph = atan(i/r)*180/M_PI - 180;
+	else /*fourth quadrant*/
+		ph = atan(i/r)*180/M_PI + 360;
+
+	return (ph);
+}
+
+/****************************************************************************/
 
 static inline char
 ad5933_imped_calc(usb_dev_handle *h, st_imped_data_t *imped, double gf)
@@ -311,6 +328,7 @@ ad5933_imped_calc(usb_dev_handle *h, st_imped_data_t *imped, double gf)
 	m = ad5933_magnitude_calc(i.real_msb, i.real_lsb, i.imag_msb, i.imag_lsb);
 
 	imped->magnitude = 1/(pow(10,-9)*m*gf);
+	imped->phase = ad5933_phase_calc(i.real_msb, i.real_lsb, i.imag_msb, i.imag_lsb);
 
 	return (0);	
 }
@@ -367,6 +385,7 @@ main (int argc, char **argv)
 	st_imped_data_t imped;
 	st_imped_data_raw_t ir;
 	double gf = 0.0;
+	unsigned char pd = MASK_PD_MODE;
 
 	bzero(&imped, sizeof(imped));
 	bzero(&ir, sizeof(ir));
@@ -416,7 +435,10 @@ main (int argc, char **argv)
 	ad5933_imped_calc(usbdevhandle, &imped, gf);
 
 	printf("GF = %04f\n\r", gf);
-	printf("IMP = %04f\n\r", imped.magnitude);
+	printf("Z = %04f PH: %04f \n\r", imped.magnitude, imped.phase);;
+
+	printf("Power Down\n\r");
+	ad5933_reg_write(usbdevhandle, AD5933_CTRL_REG_MSB, pd, 1);
 
     //usb_close(usbdevhandle);
 	return (0);
