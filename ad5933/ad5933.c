@@ -43,13 +43,13 @@ typedef struct {
 /********************************************************************************/
 
 static inline char
-ad5933_reg_write(usb_dev_handle *h, unsigned char addr, unsigned char val, unsigned char sz)
+ad5933_reg_write(usb_dev_handle *h, unsigned char addr, unsigned char val)
 {
 	unsigned char ret = 0;
 	unsigned char dum = val & 0xff;
 
-	printf("addr 0x%x data 0x%x\n\r", addr, (val<<8) | addr);
-	ret = usb_control_msg(h, 0x40, 0xde, 0x0d, val << 8 | addr, &dum, sz, 1000);
+	//printf("addr 0x%x data 0x%x\n\r", addr, (val<<8) | addr);
+	ret = usb_control_msg(h, 0x40, 0xde, 0x0d, val << 8 | addr, &dum, 1, 1000);
 
 	return (ret);
 }
@@ -57,11 +57,11 @@ ad5933_reg_write(usb_dev_handle *h, unsigned char addr, unsigned char val, unsig
 /********************************************************************************/
 
 static inline char
-ad5933_reg_read(usb_dev_handle *h, unsigned char reg, unsigned char *val, unsigned char sz)
+ad5933_reg_read(usb_dev_handle *h, unsigned char reg, unsigned char *val)
 {
 	unsigned char ret = 0;
 
-	ret = usb_control_msg(h, 0xc0, 0xde, 0x0d, reg, val, sz, 1000);
+	ret = usb_control_msg(h, 0xc0, 0xde, 0x0d, reg, val, 1, 1000);
 
 	return (ret);
 }
@@ -73,7 +73,7 @@ ad5933_get_status(usb_dev_handle *h)
 {
 	char sts_reg = 0x0;
 
-	ad5933_reg_read(h, AD5933_STS_REG, &sts_reg, 1);
+	ad5933_reg_read(h, AD5933_STS_REG, &sts_reg);
 
 	//printf("status reg = 0x%x\n\r", sts_reg);
 
@@ -87,11 +87,10 @@ ad5933_reset(usb_dev_handle *h)
 {
 	unsigned char ctrl_lsb = 0x00;
 
-	ad5933_reg_read(h, AD5933_CTRL_REG_LSB, &ctrl_lsb, 1);
+	ad5933_reg_read(h, AD5933_CTRL_REG_LSB, &ctrl_lsb);
 
 	ctrl_lsb |= MASK_RESET_TRUE;
-	ad5933_reg_write(h, AD5933_CTRL_REG_LSB, ctrl_lsb, 1);
-	ad5933_reg_read(h, AD5933_CTRL_REG_LSB, &ctrl_lsb, 1);
+	ad5933_reg_write(h, AD5933_CTRL_REG_LSB, ctrl_lsb);
 
 	return (0);
 }
@@ -105,23 +104,12 @@ ad5933_imped_read(usb_dev_handle *h, st_imped_data_raw_t *ir)
 
 	bzero(ir, sizeof(ir));
 
-	ret |= ad5933_reg_read(h, AD5933_REAL_DATA_MSB, &(ir->real_msb), 1);
-	ret |= ad5933_reg_read(h, AD5933_REAL_DATA_LSB, &(ir->real_lsb), 1);
-	ret |= ad5933_reg_read(h, AD5933_IMAG_DATA_MSB, &(ir->imag_msb), 1);
-	ret |= ad5933_reg_read(h, AD5933_IMAG_DATA_MSB, &(ir->imag_lsb), 1);
+	ret |= ad5933_reg_read(h, AD5933_REAL_DATA_MSB, &(ir->real_msb));
+	ret |= ad5933_reg_read(h, AD5933_REAL_DATA_LSB, &(ir->real_lsb));
+	ret |= ad5933_reg_read(h, AD5933_IMAG_DATA_MSB, &(ir->imag_msb));
+	ret |= ad5933_reg_read(h, AD5933_IMAG_DATA_MSB, &(ir->imag_lsb));
 
 	return (ret);
-}
-
-/********************************************************************************/
-
-static inline double
-ad5933_magnitude_calc(unsigned char rmsb, unsigned char rlsb, unsigned char imsb, unsigned char ilsb)
-{
-	double r = (rmsb << 8) | (rlsb);
-	double i = (imsb << 8) | (ilsb);
-	double m = sqrt( pow(r,2)+pow(i,2) );
-	return m;
 }
 
 /********************************************************************************/
@@ -143,9 +131,9 @@ ad5933_start_freq_calc(usb_dev_handle *h, double freq)
 	f2 = (freq_code >> 8) & 0xff;
 	f3 = (freq_code) & 0xff;
 
-	ad5933_reg_write(h, AD5933_START_FREQ1, f1, 1);
-	ad5933_reg_write(h, AD5933_START_FREQ2, f2, 1);
-	ad5933_reg_write(h, AD5933_START_FREQ3, f3, 1);
+	ad5933_reg_write(h, AD5933_START_FREQ1, f1);
+	ad5933_reg_write(h, AD5933_START_FREQ2, f2);
+	ad5933_reg_write(h, AD5933_START_FREQ3, f3);
 
 	return (0);
 }
@@ -158,8 +146,8 @@ ad5933_numb_incr_set(usb_dev_handle *h, unsigned int inc)
 	unsigned char msb = (inc >> 8) & 0xff;
 	unsigned char lsb = inc & 0xff;
 
-	ad5933_reg_write(h, AD5933_NUMB_INCR_MSB, msb, 1);
-	ad5933_reg_write(h, AD5933_NUMB_INCR_LSB, lsb, 1);
+	ad5933_reg_write(h, AD5933_NUMB_INCR_MSB, msb);
+	ad5933_reg_write(h, AD5933_NUMB_INCR_LSB, lsb);
 
 	return (0);
 }
@@ -183,9 +171,9 @@ ad5933_freq_inc_set(usb_dev_handle *h, double step)
 
 	printf("S = 0x%x\n\r", step_code);
 
-	ad5933_reg_write(h, AD5933_FREQ_INC1, f1, 1);
-	ad5933_reg_write(h, AD5933_FREQ_INC2, f2, 1);
-	ad5933_reg_write(h, AD5933_FREQ_INC3, f3, 1);
+	ad5933_reg_write(h, AD5933_FREQ_INC1, f1);
+	ad5933_reg_write(h, AD5933_FREQ_INC2, f2);
+	ad5933_reg_write(h, AD5933_FREQ_INC3, f3);
 
 	return (0);
 }
@@ -199,105 +187,36 @@ ad5933_settling_set(usb_dev_handle *h, unsigned int s, unsigned char mult)
 	unsigned char msb = (mult << 3) | ( (s << 8) & 0xff );
 	unsigned char lsb = s & 0xff;
 
-	ad5933_reg_write(h, AD5933_NUMB_SETT_MSB, msb, 1);
-	ad5933_reg_write(h, AD5933_NUMB_SETT_LSB, lsb, 1);
+	ad5933_reg_write(h, AD5933_NUMB_SETT_MSB, msb);
+	ad5933_reg_write(h, AD5933_NUMB_SETT_LSB, lsb);
 
 	return (0);
 }
 
 /****************************************************************************/
 
-/*gf = gfe-9;*/
-static inline char
-ad5933_imped_calibration(usb_dev_handle *h, double *gf)
+static inline double
+ad5933_magnitude_calc(st_imped_data_raw_t ir)
 {
-	unsigned char ret = 0;
-	st_imped_data_raw_t ir;
-	double gf1 = 0.0;
-	double gf2 = 0.0;
-	double m1 = 0.0;
-	double m2 = 0.0;
-	short real = 0x0000;
-	short imag = 0x0000;
-	unsigned char ctrl_reg = 0;
-	unsigned int steps = 511;
-	unsigned int inc = 1;
-	unsigned int i = 0;
-	unsigned char sweep_ok = 0;
-
-	/*AD5933.pdf page 22*/
-	/*1: Start frequency register*/
-	ad5933_start_freq_calc(h, 60);
-	/*2: Number of increments register*/
-	ad5933_numb_incr_set(h, steps);
-	/*3: Frequency increment register*/
-	ad5933_freq_inc_set(h, 0.2);
-	/* Settling time*/
-	ad5933_settling_set(h, 15, 0);
-
-	/*Place ad5933 in standby mode*/
-	ad5933_reset(h);
-	ad5933_reg_read(h, AD5933_CTRL_REG_MSB, &ctrl_reg, 1);
-	ctrl_reg |= MASK_SB_MODE;
-	ad5933_reg_write(h, AD5933_CTRL_REG_MSB, ctrl_reg, 1);
-
-	/*Start Frequency*/
-	ctrl_reg = MASK_INIT_START_FREQ | MASK_OUTPUT_2Vpp | MASK_PGA_GAIN5x;
-	ad5933_reg_write(h, AD5933_CTRL_REG_MSB, ctrl_reg, 1);
-	usleep(2000);
-
-	/*Calculate first point*/
-	ad5933_imped_read(h, &ir);
-	m1 = ad5933_magnitude_calc(ir.real_msb, ir.real_lsb, ir.imag_msb, ir.imag_lsb);
-
-	/*start sweep*/
-	ctrl_reg = MASK_START_FREQ_SWEEP | MASK_OUTPUT_2Vpp | MASK_PGA_GAIN5x;
-	ad5933_reg_write(h, AD5933_CTRL_REG_MSB, ctrl_reg, 1);
-
-	while ( sweep_ok != MASK_STS_FRQ_SWP_RDY)
-	{
-		unsigned char sts = 0;
-		unsigned char ctrl_inc = 0;
-		int j = 0;
-
-		ad5933_reg_read(h, AD5933_CTRL_REG_MSB, &ctrl_inc, 1);
-
-		while ((sts = (ad5933_get_status(h) & MASK_STS_IMPED_VALID)) != MASK_STS_IMPED_VALID) {
-			printf("waiting imp valid..0x%x %d\n\r", sts, j);
-			usleep(1000);
-			j++;
-			if (j==11)
-				break;
-		}
-		ad5933_imped_read(h, &ir);
-		m2 = ad5933_magnitude_calc(ir.real_msb, ir.real_lsb, ir.imag_msb, ir.imag_lsb);
-		printf("m1 = %04f m2 = %04f\n\r", m1, m2);
-
-		ctrl_inc |= MASK_INC_FREQ;
-		ad5933_reg_write(h, AD5933_CTRL_REG_MSB, ctrl_inc, 1);
-		sweep_ok = ad5933_get_status(h) & MASK_STS_FRQ_SWP_RDY;
-		printf("sweep ok 0x%x i = %d\n\r", sweep_ok, i);
-		if (i != steps)
-			sweep_ok = 0;
-		i += inc;
-	}
-
-	printf("-------------------------------------\n\r");
-	printf("%04f %04f\n\r", m1, m2);
-	printf("-------------------------------------\n\r");
-
-	/*two measures, we are considering that it varies linearly with the frequency.
-	 * The smaller the difference (delta F) in frequency, the better */
-	*gf = (pow(10,9)/AD5933_RES_CALIB_VAL)/( ((m2-m1)/2) + m2);
-
-	return (ret);
+	unsigned char rmsb = ir.real_msb;
+   	unsigned char rlsb = ir.real_lsb;
+   	unsigned char imsb = ir.imag_msb;
+   	unsigned char ilsb = ir.imag_lsb;
+	double r = (rmsb << 8) | (rlsb);
+	double i = (imsb << 8) | (ilsb);
+	double m = sqrt( pow(r,2)+pow(i,2) );
+	return m;
 }
 
 /********************************************************************************/
 
 static inline double
-ad5933_phase_calc(unsigned char rmsb, unsigned char rlsb, unsigned char imsb, unsigned char ilsb)
+ad5933_phase_calc(st_imped_data_raw_t ir)
 {
+	unsigned char rmsb = ir.real_msb;
+   	unsigned char rlsb = ir.real_lsb;
+   	unsigned char imsb = ir.imag_msb;
+   	unsigned char ilsb = ir.imag_lsb;
 	double ph = 0.0;
 	double r = (rmsb << 8) | (rlsb);
 	double i = (imsb << 8) | (ilsb);
@@ -324,15 +243,109 @@ ad5933_imped_calc(usb_dev_handle *h, st_imped_data_t *imped, double gf)
 
 	ad5933_imped_read(h, &i);
 
-	printf("0x%x 0x%x 0x%x 0x%x\n\r", i.real_msb, i.real_lsb, i.imag_msb, i.imag_lsb);
-	m = ad5933_magnitude_calc(i.real_msb, i.real_lsb, i.imag_msb, i.imag_lsb);
+	//printf("0x%x 0x%x 0x%x 0x%x\n\r", i.real_msb, i.real_lsb, i.imag_msb, i.imag_lsb);
+	m = ad5933_magnitude_calc(i);
 
 	imped->magnitude = 1/(pow(10,-9)*m*gf);
-	imped->phase = ad5933_phase_calc(i.real_msb, i.real_lsb, i.imag_msb, i.imag_lsb);
+	imped->phase = ad5933_phase_calc(i);
 
 	return (0);	
 }
+
 /********************************************************************************/
+
+/*gf = gfe-9;*/
+static inline char
+ad5933_imped_calibration(usb_dev_handle *h, double *gf)
+{
+	unsigned char ret = 0;
+	st_imped_data_raw_t ir;
+	double gf1 = 0.0;
+	double gf2 = 0.0;
+	double m1 = 0.0;
+	double m2 = 0.0;
+	short real = 0x0000;
+	short imag = 0x0000;
+	unsigned char ctrl_reg = 0;
+	double step = 0.0;
+	unsigned char sweep_ok = 0;
+	unsigned int avg_points = 0;
+
+	/*AD5933.pdf page 22*/
+	/*1: Start frequency register*/
+	ad5933_start_freq_calc(h, FREQ_LOW);
+	/*2: Number of increments register*/
+	ad5933_numb_incr_set(h, NUM_SAMPLES);
+	/*3: Frequency increment register*/
+	ad5933_freq_inc_set(h, FREQ_STEP);
+	/* Settling time*/
+	ad5933_settling_set(h, 15, 0);
+
+	/*Place ad5933 in standby mode*/
+	ad5933_reset(h);
+	ad5933_reg_read(h, AD5933_CTRL_REG_MSB, &ctrl_reg);
+	ctrl_reg |= MASK_SB_MODE;
+	ad5933_reg_write(h, AD5933_CTRL_REG_MSB, ctrl_reg);
+
+	/*Start Frequency*/
+	ctrl_reg = MASK_INIT_START_FREQ | MASK_OUTPUT_2Vpp | MASK_PGA_GAIN5x;
+	ad5933_reg_write(h, AD5933_CTRL_REG_MSB, ctrl_reg);
+	usleep(2000);
+
+	/*Calculate first point*/
+	ad5933_imped_read(h, &ir);
+	m1 = ad5933_magnitude_calc(ir);
+
+	/*start sweep*/
+	ctrl_reg = MASK_START_FREQ_SWEEP | MASK_OUTPUT_2Vpp | MASK_PGA_GAIN5x;
+	ad5933_reg_write(h, AD5933_CTRL_REG_MSB, ctrl_reg);
+
+	printf("Sweeping .. please wait\n\r");
+	while ( sweep_ok != MASK_STS_FRQ_SWP_RDY)
+	{
+		unsigned char sts = 0;
+		unsigned char ctrl_inc = 0;
+		int j = 0;
+
+		while ((sts = (ad5933_get_status(h) & MASK_STS_IMPED_VALID)) != MASK_STS_IMPED_VALID) {
+			printf("waiting imp valid..0x%x %d\n\r", sts, j);
+			usleep(1000);
+			j++;
+			if (j==10)
+				break;
+		}
+
+		//ad5933_reg_read(h, AD5933_CTRL_REG_MSB, &ctrl_inc);
+		if (avg_points < NUM_AVG_POINTS) {
+			ad5933_imped_read(h, &ir);
+			m2 = ad5933_magnitude_calc(ir);
+			printf("m1 = %04f m2 = %04f\n\r", m1, m2);
+			ctrl_inc = MASK_REPEAT_FREQ;
+			ad5933_reg_write(h, AD5933_CTRL_REG_MSB, ctrl_inc);
+			printf("point %d\n\r", avg_points);
+			avg_points++;
+		}
+		else {
+			ctrl_inc = MASK_INC_FREQ;
+			ad5933_reg_write(h, AD5933_CTRL_REG_MSB, ctrl_inc);
+			avg_points = 0;
+			sweep_ok = ad5933_get_status(h) & MASK_STS_FRQ_SWP_RDY;
+			printf("sweep ok 0x%x i = %f\n\r", sweep_ok, step);
+			if (step < (NUM_SAMPLES*FREQ_STEP))
+				sweep_ok = 0;
+			step += FREQ_STEP;
+		}
+	}
+
+	/*two measures, we are considering that it varies linearly with the frequency.
+	 * The smaller the difference (delta F) in frequency, the better */
+	*gf = (pow(10,9)/AD5933_RES_CALIB_VAL)/( ((m2-m1)/2) + m2);
+
+	return (ret);
+}
+
+/********************************************************************************/
+
 
 static inline short
 ad5933_get_temperature(usb_dev_handle *h)
@@ -344,12 +357,12 @@ ad5933_get_temperature(usb_dev_handle *h)
 
 	usb_control_msg(h, 0xc0, 0xde, 0x0d, AD5933_CTRL_REG_MSB, &control_reg_msb, 1, 1000);
 	control_reg_msb = MASK_MEAS_TEMP;
-	ad5933_reg_write(h, AD5933_CTRL_REG_MSB, control_reg_msb, 0);
+	ad5933_reg_write(h, AD5933_CTRL_REG_MSB, control_reg_msb);
 
 	printf("Temperature %s !!\n\r", (ad5933_get_status(h) & MASK_STS_TEMP_VALID) ? "Ready" : "Not Ready");
 
-	ad5933_reg_read(h, AD5933_TEMP_DATA_MSB, &t0, 1);
-	ad5933_reg_read(h, AD5933_TEMP_DATA_LSB, &t1, 1);
+	ad5933_reg_read(h, AD5933_TEMP_DATA_MSB, &t0);
+	ad5933_reg_read(h, AD5933_TEMP_DATA_LSB, &t1);
 
 	/*if positive (bit 13 = 0), temp = adc/32;
 	 * if negative (bit 13 = 1), temp = (adc - 16384)/32
@@ -377,7 +390,7 @@ main (int argc, char **argv)
 	int rv = 0;
 	unsigned char rst_dbg[10];
 	struct usb_device *usbdev = NULL;
-	struct usb_dev_handle *usbdevhandle = NULL;
+	struct usb_dev_handle *h = NULL;
 	const char *file = "../fw/hex/AD5933_34FW.hex";
 	//const char *file = "../fw/hex/hello.ihx";
 	unsigned int err = 0;
@@ -419,28 +432,30 @@ main (int argc, char **argv)
 			usbdev->bus->dirname, usbdev->filename);
 
 	/*opening device*/
-	if ( !(usbdevhandle = xusb_open(usbdev)) )
+	if ( !(h = xusb_open(usbdev)) )
 		return(1);
-	
-	usb_set_configuration(usbdevhandle,1);
-	usb_claim_interface(usbdevhandle,0);
-	usb_set_altinterface(usbdevhandle,1);
 
+	printf("%d\n\r", usb_set_configuration(h,1)) ;
+	printf("%d\n\r", usb_claim_interface(h,0)  ) ;
+	printf("%d\n\r", usb_set_altinterface(h,1) );
+
+	//usb_reset(h);
 	//fprintf(stdout, "Programming 8051 using %s \n", file);
-	//err += xusb_program_hex_file(file, usbdevhandle);
+	//err += xusb_program_hex_file(file, h);
 
-	ad5933_reset(usbdevhandle);
-	ad5933_get_temperature(usbdevhandle);
-	ad5933_imped_calibration(usbdevhandle, &gf);
-	ad5933_imped_calc(usbdevhandle, &imped, gf);
+	ad5933_reset(h);
+	ad5933_imped_calibration(h, &gf);
+	ad5933_imped_calc(h, &imped, gf);
 
 	printf("GF = %04f\n\r", gf);
 	printf("Z = %04f PH: %04f \n\r", imped.magnitude, imped.phase);;
 
-	printf("Power Down\n\r");
-	ad5933_reg_write(usbdevhandle, AD5933_CTRL_REG_MSB, pd, 1);
+	ad5933_get_temperature(h);
 
-    //usb_close(usbdevhandle);
+	printf("Power Down\n\r");
+	ad5933_reg_write(h, AD5933_CTRL_REG_MSB, pd);
+
+    //usb_close(h);
 	return (0);
 }
 
