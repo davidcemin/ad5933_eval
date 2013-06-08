@@ -80,12 +80,18 @@
 #define MASK_STS_FRQ_SWP_RDY	(0x03)
 
 /********************************************************************************/
+#define NMEMB(x)   	((sizeof(x))/(sizeof(*x)))
+
+//! below this value I consider that it equals to zero
+#define	CALCERROR	0.000001
+
+/****************************************************************************/
 
 #define AD5933_RES_FEEDBACK_VAL	(200)
 #define AD5933_RES_CALIB_VAL	(561)
 #define INT_CLK_FREQ			(16) /*MHz*/
-#define NUM_AVG_POINTS			(5)
+#define NUM_AVG_POINTS			(3)
 #define NUM_SAMPLES				(200)
-#define FREQ_STEP				(0.1)
+#define FREQ_STEP				(0.01)
 #define FREQ_LOW				(60.0)
 #define FREQ_HIGH				(FREQ_LOW+NUM_SAMPLES*FREQ_STEP)

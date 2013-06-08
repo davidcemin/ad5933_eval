@@ -38,6 +38,7 @@ typedef struct {
 typedef struct {
 	double magnitude;
 	double phase;
+	double m;
 } st_imped_data_t;
 
 /********************************************************************************/
@@ -125,7 +126,7 @@ ad5933_start_freq_calc(usb_dev_handle *h, double freq)
 
 	freq_code = freq/(INT_CLK_FREQ*250)*pow(2,27);
 
-	printf("F = 0x%x\n", freq_code);
+	//printf("F = 0x%x\n", freq_code);
 
 	f1 = (freq_code >> 16) & 0xff;
 	f2 = (freq_code >> 8) & 0xff;
@@ -169,7 +170,7 @@ ad5933_freq_inc_set(usb_dev_handle *h, double step)
 	f2 = (step_code >> 8) & 0xff;
 	f3 = (step_code) & 0xff;
 
-	printf("S = 0x%x\n\r", step_code);
+	//printf("S = 0x%x\n\r", step_code);
 
 	ad5933_reg_write(h, AD5933_FREQ_INC1, f1);
 	ad5933_reg_write(h, AD5933_FREQ_INC2, f2);
@@ -239,14 +240,13 @@ static inline char
 ad5933_imped_calc(usb_dev_handle *h, st_imped_data_t *imped, double gf)
 {
 	st_imped_data_raw_t i;
-	double m = 0;
 
 	ad5933_imped_read(h, &i);
 
 	//printf("0x%x 0x%x 0x%x 0x%x\n\r", i.real_msb, i.real_lsb, i.imag_msb, i.imag_lsb);
-	m = ad5933_magnitude_calc(i);
+	imped->m = ad5933_magnitude_calc(i);
 
-	imped->magnitude = 1/(pow(10,-9)*m*gf);
+	imped->magnitude = 1/(pow(10,-9)*imped->m*gf);
 	imped->phase = ad5933_phase_calc(i);
 
 	return (0);	
@@ -254,9 +254,115 @@ ad5933_imped_calc(usb_dev_handle *h, st_imped_data_t *imped, double gf)
 
 /********************************************************************************/
 
+/**
+ * \brief  Calculates a vectors mean
+ * \param  val Pointer to the vector
+ * \param  n nmemb of val
+ * \param  mean Pointer to mean result
+ * \return Vectors mean
+ */
+static double
+dataMean(double *val, int n)
+{	
+	double ret;
+	int i;
+	double nmemb = n - 1;
+	ret = 0.0;
+
+	for (i = 0; i < n; i++) {
+		//printf("%04f\n", val[i]);
+		ret += val[i];
+	}
+	
+	ret /= nmemb;
+
+	return (ret);
+}
+
+/******************************************************************************/
+
+/**
+ * \brief Calculates max value of a vector
+ * \param period pointer to period vector
+ * \param nmemb number of members in period
+ * \param max pointer to max value
+ * \return void
+ */
+static void maxValue(double *period, int nmemb, double *max)
+{
+	int i;
+	
+	*max = fabs(period[1]);
+
+	for (i = 1; i < nmemb; i++) 
+		if (fabs(period[i]) > *max) 
+			*max = fabs(period[i]);
+}
+
+/******************************************************************************/
+
+/**
+ * \brief Calculates min value of a vector
+ * \param period pointer to period vector
+ * \param nmemb number of members in period
+ * \param min pointer to min value
+ * \return void
+ */
+static void minValue(double *period, int nmemb, double *min)
+{
+	int i;
+	
+	*min = fabs(period[1]);
+
+	for (i = 1; i < nmemb; i++) 
+		if (fabs(period[i]) < *min) 
+			*min = fabs(period[i]);
+}
+
+/******************************************************************************/
+
+/**
+ * \brief  Calculates the variance and standard deviation
+ * \param  period pointer to period array
+ * \param  nmemb number of members
+ * \param  mean Mean of the period values
+ * \param  variance pointer to the result
+ * \param  stddev pointer to standard deviation
+ * \return void
+ */
+static void variance_stddev(double *period, int nmemb, double mean, double *variance, double *stddev)
+{
+	int i;
+	double sum = 0.0;
+	double calc = 0.0;
+
+	for (i = 0; i < nmemb; i++){
+		calc = period[i] - mean;
+		if(calc < CALCERROR)
+			calc = 0;
+		sum += pow(calc, 2);
+	}
+	*variance = (double)(sum / (nmemb));
+	*stddev = (double)sqrt(*variance);
+}
+
+/******************************************************************************/
+
+static inline char
+ad5933_imp_avg_calc(st_imped_data_t *imp_data, double *m, double *magnitude, double *phase)
+{
+	imp_data->m = dataMean(m, NUM_AVG_POINTS);
+	imp_data->magnitude = dataMean(magnitude, NUM_AVG_POINTS);
+	imp_data->phase = dataMean(phase, NUM_AVG_POINTS);
+
+	return (0);
+}
+
+/****************************************************************************/
+
 /*gf = gfe-9;*/
 static inline char
-ad5933_imped_calibration(usb_dev_handle *h, double *gf)
+ad5933_imped_sweep(usb_dev_handle *h, unsigned char cal, double *gf, st_imped_data_t *imped)
 {
 	unsigned char ret = 0;
 	st_imped_data_raw_t ir;
@@ -270,6 +376,26 @@ ad5933_imped_calibration(usb_dev_handle *h, double *gf)
 	double step = 0.0;
 	unsigned char sweep_ok = 0;
 	unsigned int avg_points = 0;
+	st_imped_data_t imp_data[NUM_SAMPLES];
+	st_imped_data_t imp_data_avg;
+	unsigned int sample = 0;
+	double m[NUM_AVG_POINTS];
+	double magnitude[NUM_AVG_POINTS];
+	double phase[NUM_AVG_POINTS];
+	double mag[NUM_SAMPLES];
+	double ph[NUM_SAMPLES];
+	unsigned int i;
+
+	bzero(mag, sizeof(mag));
+	bzero(ph, sizeof(ph));
+
+
+
+	bzero(m, sizeof(m));
+	bzero(magnitude, sizeof(magnitude));
+	bzero(phase, sizeof(phase));
+	bzero(imp_data, sizeof(imp_data));
+	bzero(&imp_data_avg, sizeof(imp_data_avg));
 
 	/*AD5933.pdf page 22*/
 	/*1: Start frequency register*/
@@ -292,55 +418,67 @@ ad5933_imped_calibration(usb_dev_handle *h, double *gf)
 	ad5933_reg_write(h, AD5933_CTRL_REG_MSB, ctrl_reg);
 	usleep(2000);
 
-	/*Calculate first point*/
-	ad5933_imped_read(h, &ir);
-	m1 = ad5933_magnitude_calc(ir);
-
 	/*start sweep*/
 	ctrl_reg = MASK_START_FREQ_SWEEP | MASK_OUTPUT_2Vpp | MASK_PGA_GAIN5x;
 	ad5933_reg_write(h, AD5933_CTRL_REG_MSB, ctrl_reg);
 
-	printf("Sweeping .. please wait\n\r");
-	while ( sweep_ok != MASK_STS_FRQ_SWP_RDY)
+	while (sweep_ok != MASK_STS_FRQ_SWP_RDY)
 	{
 		unsigned char sts = 0;
 		unsigned char ctrl_inc = 0;
 		int j = 0;
-
+		
 		while ((sts = (ad5933_get_status(h) & MASK_STS_IMPED_VALID)) != MASK_STS_IMPED_VALID) {
-			printf("waiting imp valid..0x%x %d\n\r", sts, j);
+			//printf("waiting imp valid..0x%x %d\n\r", sts, j);
 			usleep(1000);
 			j++;
 			if (j==10)
 				break;
 		}
 
+		//TODO: Average is still not working well.
 		//ad5933_reg_read(h, AD5933_CTRL_REG_MSB, &ctrl_inc);
 		if (avg_points < NUM_AVG_POINTS) {
-			ad5933_imped_read(h, &ir);
-			m2 = ad5933_magnitude_calc(ir);
-			printf("m1 = %04f m2 = %04f\n\r", m1, m2);
+			ad5933_imped_calc(h, &imp_data_avg, *gf);
+			m[avg_points] = imp_data_avg.m;
+			magnitude[avg_points] = imp_data_avg.magnitude;
+			phase[avg_points] = imp_data_avg.phase;
+			//printf("m = %04f\n\r", m[avg_points]);
 			ctrl_inc = MASK_REPEAT_FREQ;
 			ad5933_reg_write(h, AD5933_CTRL_REG_MSB, ctrl_inc);
-			printf("point %d\n\r", avg_points);
+			//printf("point %d\n\r", avg_points);
 			avg_points++;
 		}
 		else {
+			//ad5933_imp_avg_calc(&imp_data[sample], m, magnitude, phase);
+			ad5933_imped_calc(h, &imp_data[sample], *gf);
 			ctrl_inc = MASK_INC_FREQ;
 			ad5933_reg_write(h, AD5933_CTRL_REG_MSB, ctrl_inc);
 			avg_points = 0;
 			sweep_ok = ad5933_get_status(h) & MASK_STS_FRQ_SWP_RDY;
-			printf("sweep ok 0x%x i = %f\n\r", sweep_ok, step);
+			//printf("sweep ok 0x%x i = %f\n\r", sweep_ok, step);
 			if (step < (NUM_SAMPLES*FREQ_STEP))
 				sweep_ok = 0;
 			step += FREQ_STEP;
+			sample++;
 		}
 	}
-
 	/*two measures, we are considering that it varies linearly with the frequency.
 	 * The smaller the difference (delta F) in frequency, the better */
-	*gf = (pow(10,9)/AD5933_RES_CALIB_VAL)/( ((m2-m1)/2) + m2);
-
+	if (cal) {
+		m1 = imp_data[0].m;
+		m2 = imp_data[NUM_SAMPLES-1].m;
+		*gf = (pow(10,9)/AD5933_RES_CALIB_VAL)/( ((m2-m1)/2) + m2);
+		//printf("m1 = %04f m2 %04f\n\r", m1, m2);
+	}
+	for (i=0; i<NUM_SAMPLES;i++) {
+		mag[i] = imp_data[i].magnitude;
+		ph[i] = imp_data[i].phase;
+	}
+	
+	imped->magnitude = dataMean(mag, NUM_SAMPLES);
+	imped->phase = dataMean(ph, NUM_SAMPLES);
+	
 	return (ret);
 }
 
@@ -444,8 +582,10 @@ main (int argc, char **argv)
 	//err += xusb_program_hex_file(file, h);
 
 	ad5933_reset(h);
-	ad5933_imped_calibration(h, &gf);
-	ad5933_imped_calc(h, &imped, gf);
+	printf("Calibrating...\n\r");
+	ad5933_imped_sweep(h, 1, &gf, &imped);
+	printf("Running!\n\r");
+	ad5933_imped_sweep(h, 0, &gf, &imped);
 
 	printf("GF = %04f\n\r", gf);
 	printf("Z = %04f PH: %04f \n\r", imped.magnitude, imped.phase);;
