@@ -515,7 +515,57 @@ ad5933_get_temperature(usb_dev_handle *h)
 	return (temp);
 }
 
+/********************************************************************************/
 
+static char
+data_save(st_imped_data_t imped, unsigned int t)
+{
+	FILE *fd;
+
+	if ( (fd = fopen("data/imped_data.txt", "a+")) == NULL)
+	{
+		fprintf(stderr, "Error opening file for writing!\n\r");
+		return (-1);
+	}
+
+	fprintf(fd, "%d\t%f\t%f\n\r", t, imped.magnitude, imped.phase);
+
+	fclose(fd);
+
+	return (0);
+}
+
+/********************************************************************************/
+
+static char
+ad5933_data_collect(usb_dev_handle *h, double gf)
+{
+	unsigned int t = 0;
+	unsigned int i;
+	unsigned char pd = MASK_PD_MODE;
+	st_imped_data_t imped;
+
+	while(1)
+	{
+		bzero(&imped, sizeof(imped));
+		ad5933_imped_sweep(h, 0, &gf, &imped);
+		ad5933_reg_write(h, AD5933_CTRL_REG_MSB, pd);
+		printf("t = %d Z = %04f PH: %04f \n\r", t, imped.magnitude, imped.phase);;
+		data_save(imped, t);
+
+		/*wait a minute*/
+		for (i = 0; i < MEASURE_INTERVAL; i++) {
+			fprintf(stdout, "%d\r", i);
+			fflush(stdout);
+			sleep(1);
+		}
+		printf("\n");
+		t++;
+	}
+
+	return (0);
+}
+ 
 /********************************************************************************/
 /* Public stuff																	*/
 /********************************************************************************/
@@ -543,7 +593,7 @@ main (int argc, char **argv)
 
 	/* Initializing libusb*/
 	usb_init();
-	usb_set_debug(2);
+	//usb_set_debug(2);
 
 	/*find busses*/
 	if ( (rv = usb_find_busses() ) < 0) 
@@ -584,11 +634,9 @@ main (int argc, char **argv)
 	ad5933_reset(h);
 	printf("Calibrating...\n\r");
 	ad5933_imped_sweep(h, 1, &gf, &imped);
-	printf("Running!\n\r");
-	ad5933_imped_sweep(h, 0, &gf, &imped);
-
 	printf("GF = %04f\n\r", gf);
-	printf("Z = %04f PH: %04f \n\r", imped.magnitude, imped.phase);;
+	printf("Running!\n\r");
+	ad5933_data_collect(h, gf);
 
 	ad5933_get_temperature(h);
 
