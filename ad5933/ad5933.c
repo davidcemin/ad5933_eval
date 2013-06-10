@@ -18,6 +18,12 @@
  * 
  */
 /********************************************************************************/
+#include <stdio.h>
+#include <stdlib.h>
+#include <ctype.h>
+
+#include "xusb.h"
+
 
 #include "ad5933.h"
 #include "ad5933_utils.h" 
