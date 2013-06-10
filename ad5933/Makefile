@@ -52,13 +52,13 @@ OBJS	 = $(XUSB_DIR)/*.o
 LIBFILES =
 
 #General
-QUIET = 
+QUIET = @
 
 .PHONY: clean clobber dist
 
 all: $(TARGET)
 
-$(TARGET): $(OBJECTS)
+$(TARGET): stats.o ad5933_utils.o ad5933.o
 	$(QUIET)echo Compiling executable file: $@
 	$(QUIET)${CC} $(LDFLAGS) -o $@  $^ $(OBJS) $(LIBFILES)
 
